@@ -1,43 +1,28 @@
 go2_webrtc_bridge:
   ros__parameters:
-    # Go2 connection
-    robot_ip: "192.168.8.181"
-    connection_method: "LocalSTA"
-    serial_number: ""
-    aes_128_key: ""
-    region: "global"
-    device_type: "Go2"
+    robot_ip: "192.168.123.161"
 
     # LiDAR
-    lidar_auto_enable: false
+    lidar_auto_enable: true
     lidar_decoder: "native"
     enable_slam_subscriptions: true
-    # The utlidar voxel_map already arrives in "odom"; keep its frame_id.
     lidar_use_payload_frame: true
 
     # Where /go2/imu/data comes from. SportModState is the only topic whose
     # imu_state carries the full quaternion + gyroscope + accelerometer set;
     # lowstate carries rpy only.
-    imu_source: "sport"   # sport | lowstate | both
+    imu_source: "sport" # sport | lowstate | both
 
-    # Frames. SportModState.velocity / yaw_speed are body-frame, and
-    # nav_msgs/Odometry expects the twist in child_frame_id, so base_frame is
-    # the frame those twists are expressed in. Keep these consistent with the
-    # rest of your TF tree.
     base_frame: "base_link"
+    imu_frame: "imu_link"
+    lidar_frame: "lidar_link"
 
     # Safety: keep false during bring-up.
-    enable_cmd_vel: false
-    cmd_vel_timeout: 0.5
+    enable_cmd_vel: true
+    cmd_vel_timeout: 1.0
     max_cmd_vx: 1.0
     max_cmd_vy: 1.0
-    max_cmd_wz: 2.0
-
-    # TF frames used by typed outputs.
-    imu_frame: "imu_link"
-    # Only a fallback: the cloud keeps its own frame_id ("odom") unless
-    # lidar_use_payload_frame is false.
-    lidar_frame: "lidar_link"
+    max_cmd_wz: 1.0
 
     # ---- Recording fidelity (/go2/raw/... only, typed topics unaffected) ----
     #

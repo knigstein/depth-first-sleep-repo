@@ -401,6 +401,7 @@ class Go2WebRTCBridge(Node):
             name: TopicStats() for name in DATA_TOPICS.values()
         }
 
+        self._last_rx_time = 0.0
         self._latest_cmd_time = 0.0
         self._cmd_vel_latest = None
         self._lidar_wanted = False
@@ -561,6 +562,7 @@ class Go2WebRTCBridge(Node):
     def _count(self, topic: str, size: int) -> None:
         with self._lock:
             self._stats[topic].update(size)
+            self._last_rx_time = time.monotonic()
 
     def _publish_odometry_generic(
         self,
@@ -1163,7 +1165,8 @@ class Go2WebRTCBridge(Node):
                 self._cmd_vel_latest = None
                 self._latest_cmd_time = 0.0
                 self._stopping.set()
-                self._publish_connection("disconnected")
+                if not self._shutdown_requested.is_set():
+                    self._publish_connection("disconnected")
             if self._shutdown_requested.is_set():
                 break
             for _ in range(50):  # ~5 s pause between sessions
@@ -1238,8 +1241,7 @@ class Go2WebRTCBridge(Node):
         if bool(self.get_parameter("lidar_auto_enable").value) or self._lidar_wanted:
             await self._set_lidar(True)
 
-        # Watch channel liveness; on death tear the session down so the thread
-        # above reconnects with a fresh connection.
+        self._last_rx_time = time.monotonic()
         self._watchdog_task = asyncio.ensure_future(self._watchdog_loop())
         self._cmd_vel_task = asyncio.ensure_future(self._cmd_vel_loop())
 
@@ -1310,12 +1312,17 @@ class Go2WebRTCBridge(Node):
     async def _watchdog_loop(self) -> None:
         while True:
             if self._shutdown_requested.is_set():
-                break
+                return
             await asyncio.sleep(2.0)
             if self._shutdown_requested.is_set():
-                break
+                return
             if not self._connection_alive():
                 self.get_logger().warning("WebRTC channel lost - reconnecting")
+                break
+            if self._last_rx_time and (time.monotonic() - self._last_rx_time) > 5.0:
+                self.get_logger().warning(
+                    "No data received for 5 s - treating connection as dead"
+                )
                 break
         # Tear the session down; the thread loop builds a fresh one.
         try:
